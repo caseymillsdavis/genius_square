@@ -25,6 +25,8 @@ src/gs_stats.c        tool: histogram, hardest boards, trap classification
 src/gs_analyze.c      tool: heat maps, spectra, blocking patterns
 src/gs_selftest.c     structural checks + throughput probe
 docs/                 PLAN, ALGORITHMS, FORMATS, HARDNESS + generated results
+docs/tutorial/        pedagogical deep dive (read this to *learn* the design;
+                      keep it consistent if you change what it describes)
 data/counts.gsc       the computed count table (committed, ~2 MB)
 ```
 

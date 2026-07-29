@@ -70,10 +70,19 @@ random boards with a from-scratch dancing-links engine.
 
 Details: [docs/ALGORITHMS.md](docs/ALGORITHMS.md).
 
+## Learning the internals
+
+[docs/tutorial/](docs/tutorial/README.md) is a four-part walkthrough that
+*teaches* the machinery from first principles -- bit tricks and ranking,
+the search engines and the one-pass global enumeration, the group theory,
+and the mathematics of the hardness analysis -- with worked examples and
+exercises. The other docs are terse references by comparison.
+
 ## Repository map
 
 ```
 src/            the library and the five tools (see AGENTS.md)
+docs/tutorial/  four-part deep dive: representations, search, symmetry, analysis
 docs/PLAN.md    goals and status
 docs/ALGORITHMS.md   the counting scheme, symmetry, pruning, verification
 docs/FORMATS.md      cell numbering, board ranks, file formats
