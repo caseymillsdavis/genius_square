@@ -31,16 +31,25 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 
 #define NPAIR 630                        /* C(36,2) */
+#define NTRIP 7140                       /* C(36,3) */
 
 static int    pair_id[GS_CELLS][GS_CELLS];
 static int    pair_i[NPAIR], pair_j[NPAIR];
+static gs_mask tri_mask[NTRIP];          /* triple, colex order */
 
 /* <1_S, 1_S'> = number of boards containing S union S' */
 static const double gram_u[8] = {
     8347680.0, 1623160.0, 278256.0, 40920.0, 4960.0, 465.0, 30.0, 1.0
 };
+
+/* colex rank of a triple a < b < c: C(a,1) + C(b,2) + C(c,3) */
+static inline int trip_rank(int a, int b, int c)
+{
+    return (int)(gs_binom[a][1] + gs_binom[b][2] + gs_binom[c][3]);
+}
 
 /* ------------------------------------------------------------------ */
 /* dense symmetric solve (Cholesky) and Jacobi eigenvalues             */
@@ -184,15 +193,19 @@ int main(int argc, char **argv)
     const char *cpath = "data/counts.gsc";
     const char *opath = NULL;
     long hard_T = 0;                  /* 0 => study unsolvable boards */
+    int  deg3 = 0;
 
     for (int i = 1; i < argc; i++) {
         if      (!strcmp(argv[i], "-c") && i + 1 < argc) cpath = argv[++i];
         else if (!strcmp(argv[i], "-o") && i + 1 < argc) opath = argv[++i];
         else if (!strcmp(argv[i], "--hard") && i + 1 < argc) hard_T = atol(argv[++i]);
+        else if (!strcmp(argv[i], "--deg3")) deg3 = 1;
         else { fprintf(stderr,
-                 "usage: %s [-c counts.gsc] [-o report.md] [--hard T]\n"
+                 "usage: %s [-c counts.gsc] [-o report.md] [--hard T] [--deg3]\n"
                  "  default studies unsolvable boards; --hard T studies boards\n"
-                 "  with 1..T solutions instead\n", argv[0]); return 1; }
+                 "  with 1..T solutions instead; --deg3 adds the degree-3\n"
+                 "  Johnson projection (7140x7140 Cholesky, ~0.5 GB, minutes)\n",
+                 argv[0]); return 1; }
     }
 
     gs_init_all();
@@ -201,6 +214,12 @@ int main(int argc, char **argv)
             pair_id[i][j] = pair_id[j][i] = k;
             pair_i[k] = i; pair_j[k] = j;
         }
+    /* triples in colex order: rank runs 0..NTRIP-1 exactly in this loop order */
+    for (int c = 2, k = 0; c < GS_CELLS; c++)
+        for (int b = 1; b < c; b++)
+            for (int a = 0; a < b; a++, k++)
+                tri_mask[k] = ((gs_mask)1 << a) | ((gs_mask)1 << b)
+                            | ((gs_mask)1 << c);
 
     uint32_t n = 0;
     uint32_t *canon = gs_read_canon(cpath, &n);
@@ -213,10 +232,11 @@ int main(int argc, char **argv)
     FILE *out = opath ? fopen(opath, "w") : stdout;
     if (!out) { perror(opath); return 1; }
 
-    /* ---- first and second moments of the class indicator ---- */
+    /* ---- first, second (and optionally third) moments of the indicator ---- */
     double  U = 0;
     double *m1 = calloc(GS_CELLS, sizeof *m1);
     double *m2 = calloc(NPAIR, sizeof *m2);
+    double *m3 = deg3 ? calloc(NTRIP, sizeof *m3) : NULL;
     int c7[GS_PEGS];
     for (int i = 0; i < GS_PEGS; i++) c7[i] = i;
     for (uint32_t rank = 0; rank < GS_NBOARDS; rank++) {
@@ -228,6 +248,11 @@ int main(int argc, char **argv)
                 m1[c7[i]] += 1.0;
                 for (int j = i + 1; j < GS_PEGS; j++) m2[pair_id[c7[i]][c7[j]]] += 1.0;
             }
+            if (m3)
+                for (int i = 0; i < GS_PEGS; i++)
+                    for (int j = i + 1; j < GS_PEGS; j++)
+                        for (int k = j + 1; k < GS_PEGS; k++)
+                            m3[trip_rank(c7[i], c7[j], c7[k])] += 1.0;
         }
         int i = GS_PEGS - 1;
         while (i >= 0 && c7[i] == GS_CELLS - GS_PEGS + i) i--;
@@ -313,6 +338,36 @@ int main(int argc, char **argv)
         }
         free(G); free(b); free(rhs);
     }
+    /* Degree 3: the span of the C(36,3) = 7140 triple indicators.  Same
+     * normal equations, just bigger: the Gram matrix is 7140^2 doubles
+     * (~0.4 GB) and the Cholesky is n^3/3 ~ 1.2e11 flops.  The inclusion
+     * matrix W_{3,7} has full rank C(36,3) (3 <= min(7, 29)), so the Gram
+     * matrix is positive definite and the row-form Cholesky is safe. */
+    double r2_3 = -1;
+    if (m3) {
+        double t0 = (double)clock() / CLOCKS_PER_SEC;
+        double *G = malloc((size_t)NTRIP * NTRIP * sizeof *G);
+        double *b = malloc((size_t)NTRIP * sizeof *b);
+        double *rhs = malloc((size_t)NTRIP * sizeof *rhs);
+        if (!G || !b || !rhs) { fprintf(stderr, "deg3: out of memory\n"); return 1; }
+        for (int s = 0; s < NTRIP; s++) {
+            b[s] = rhs[s] = m3[s];
+            for (int t = 0; t < NTRIP; t++) {
+                int u = 6 - __builtin_popcountll(tri_mask[s] & tri_mask[t]);
+                G[(size_t)s * NTRIP + t] = gram_u[u];
+            }
+        }
+        fprintf(stderr, "  deg3: Gram built, factoring 7140x7140...\n");
+        if (cholesky_solve(G, b, NTRIP) == 0) {
+            double dot = 0;
+            for (int s = 0; s < NTRIP; s++) dot += b[s] * rhs[s];
+            r2_3 = (dot - U * U / N) / ssq_total;
+        } else
+            fprintf(stderr, "  deg3: Cholesky failed (Gram not PD?)\n");
+        fprintf(stderr, "  deg3 done in %.1f s cpu\n",
+                (double)clock() / CLOCKS_PER_SEC - t0);
+        free(G); free(b); free(rhs);
+    }
 
     fprintf(out, "## How much of hardness is low order?\n\n");
     fprintf(out,
@@ -323,9 +378,15 @@ int main(int argc, char **argv)
     fprintf(out, "| degree 0 (base rate) | 1 | 0.0000 |\n");
     fprintf(out, "| degree <= 1 (per-cell weights) | 36 | %.4f |\n", r2_1);
     fprintf(out, "| degree <= 2 (per-pair weights) | 630 | %.4f |\n", r2_2);
-    fprintf(out, "\nEnergy in level 1 alone: %.4f; in level 2 alone: %.4f; "
-                 "unexplained by degree <= 2: %.4f.\n\n",
-            r2_1, r2_2 - r2_1, 1.0 - r2_2);
+    if (r2_3 >= 0)
+        fprintf(out, "| degree <= 3 (per-triple weights) | 7140 | %.4f |\n", r2_3);
+    fprintf(out, "\nEnergy in level 1 alone: %.4f; in level 2 alone: %.4f",
+            r2_1, r2_2 - r2_1);
+    if (r2_3 >= 0)
+        fprintf(out, "; in level 3 alone: %.4f; unexplained by degree <= 3: "
+                     "%.4f.\n\n", r2_3 - r2_2, 1.0 - r2_3);
+    else
+        fprintf(out, "; unexplained by degree <= 2: %.4f.\n\n", 1.0 - r2_2);
 
     /* ---- second-order excess co-occurrence, spectrally ---- */
     double *M = calloc((size_t)GS_CELLS * GS_CELLS, sizeof *M);
@@ -585,6 +646,6 @@ int main(int argc, char **argv)
     }
 
     if (opath) { fclose(out); fprintf(stderr, "  wrote %s\n", opath); }
-    free(m1); free(m2); free(M); free(counts);
+    free(m1); free(m2); free(m3); free(M); free(counts);
     return 0;
 }

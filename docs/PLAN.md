@@ -78,8 +78,6 @@ file layout), `docs/HARDNESS.md` (the analysis design), plus the generated
 
 ## Not done / possible next steps
 
-* Degree-3 Johnson projection (7140x7140 Cholesky, ~400 MB, minutes). Would
-  sharpen the claim about where the residual structure lives.
 * A symmetry-adapted cell ordering that makes all eight D4 elements cuttable.
   Worth up to 8x on paper; costs the row-major frontier that the connectivity
   prune depends on. Would need measuring, not guessing.

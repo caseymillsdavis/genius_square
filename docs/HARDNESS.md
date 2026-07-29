@@ -111,8 +111,10 @@ and the right-hand side of the normal equations is the moment
 
 obtained in a single pass over the class (for each board, bump all `C(7,k)` of
 its `k`-subsets). The systems are tiny -- 36x36 for degree 1, 630x630 for
-degree 2 -- and solved by Cholesky. Degree 3 is 7140x7140, still feasible
-(~400 MB, a few minutes) if it ever looks worth it.
+degree 2 -- and solved by Cholesky. Degree 3 is 7140x7140 (~0.4 GB, ~100 s);
+`gs_analyze --deg3` runs it. The inclusion matrix `W_{3,7}` has full rank
+`C(36,3)` since `3 <= min(7, 29)`, so the Gram matrix stays positive definite
+and the plain Cholesky is safe.
 
 `R^2` is then `(a^T m - U^2/N) / (U - U^2/N)` where `U` is the class size and
 `N = 8347680`.
@@ -208,8 +210,31 @@ hardness, all computable in microseconds:
 | The "spectral study" | eigenmodes of that matrix; DCT power ratios | implemented |
 | Which configurations are actually fatal? | minimal blocking sets, exact | implemented |
 | Which boards fail for no local reason? | coverage residue | implemented |
-| Pure degree-3 energy | 7140x7140 Cholesky | not done; feasible |
+| Pure degree-3 energy | 7140x7140 Cholesky (`--deg3`) | implemented |
 
 The headline claim I would want to defend at the end: *the heat map is a
 summary, the blocking patterns are the explanation, and the interesting boards
 are the ones the blocking patterns miss.*
+
+### What the decomposition came out as
+
+For the unsolvable class, the exact explained-variance ladder is
+
+```
+    degree <= 1 : R^2 = 0.0099
+    degree <= 2 : R^2 = 0.2224
+    degree <= 3 : R^2 = 0.3466
+```
+
+so the pure levels carry 1.0%, 21.3%, and 12.4% of the variance, and **65% of
+unsolvability is degree >= 4**. The ladder for the near-miss class (1..100
+solutions) is similar (0.042 / 0.245 / 0.365, see ANALYSIS_HARD.md). Two
+readings, both defensible:
+
+* Level 2 is the single biggest identifiable component -- pair effects (corner
+  sealing, adjacent-diagonal chokes) are the strongest *nameable* mechanism,
+  and level 3 already adds less than level 2 did.
+* But the majority of the signal is genuinely high-order, which the blocking
+  patterns say too, independently: no pattern smaller than 6 cells is fatal,
+  and the 6-cell fatal patterns cover only 3.7% of the unsolvable class. Most
+  unsolvable boards are seven-peg conspiracies, not local accidents dressed up.

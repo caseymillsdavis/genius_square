@@ -37,8 +37,9 @@ explained relative to the constant model.
 | degree 0 (base rate) | 1 | 0.0000 |
 | degree <= 1 (per-cell weights) | 36 | 0.0419 |
 | degree <= 2 (per-pair weights) | 630 | 0.2448 |
+| degree <= 3 (per-triple weights) | 7140 | 0.3646 |
 
-Energy in level 1 alone: 0.0419; in level 2 alone: 0.2029; unexplained by degree <= 2: 0.7552.
+Energy in level 1 alone: 0.0419; in level 2 alone: 0.2029; in level 3 alone: 0.1198; unexplained by degree <= 3: 0.6354.
 
 ## Degree 2: co-occurrence beyond the heat map
 

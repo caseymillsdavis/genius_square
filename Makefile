@@ -59,8 +59,8 @@ counts: $(DATA)/counts.gsc
 
 report: $(BIN)/gs_stats $(BIN)/gs_analyze $(DATA)/counts.gsc
 	$(BIN)/gs_stats   -c $(DATA)/counts.gsc -o $(DOCS)/RESULTS.md --threshold 400 --top 20
-	$(BIN)/gs_analyze -c $(DATA)/counts.gsc -o $(DOCS)/ANALYSIS_UNSOLVABLE.md
-	$(BIN)/gs_analyze -c $(DATA)/counts.gsc --hard 100 -o $(DOCS)/ANALYSIS_HARD.md
+	$(BIN)/gs_analyze -c $(DATA)/counts.gsc --deg3 -o $(DOCS)/ANALYSIS_UNSOLVABLE.md
+	$(BIN)/gs_analyze -c $(DATA)/counts.gsc --deg3 --hard 100 -o $(DOCS)/ANALYSIS_HARD.md
 
 all-data: counts report
 
