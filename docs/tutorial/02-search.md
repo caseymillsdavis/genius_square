@@ -45,13 +45,60 @@ the boundary between decided and undecided territory is a short ragged line,
 which keeps the connectivity structure of the empty region simple -- and that
 is what the pruner feeds on.
 
+### Interlude: the empty region, components, and flood fill from zero
+
+Three terms of art appear constantly below; here they are with no background
+assumed.
+
+**The empty region.** At any moment mid-search, each of the 36 cells is
+either occupied (a peg, or a piece already placed) or still empty. The empty
+region is the set of empty cells -- one set, of any shape.
+
+**Neighbors, connectedness, components.** Two cells are *neighbors* if they
+share an edge (up/down/left/right -- not diagonally, because that is how the
+cells of a physical piece attach to each other). A set of cells is
+*connected* if you can travel between any two of its cells by neighbor steps
+without leaving the set -- think of the set as land, everything else as
+water: connected means one island. A *connected component* is a maximal
+island, and every set splits uniquely into components:
+
+```
+   A B C D E F
+1  . . # . . .        empty region = 30 cells, but two islands:
+2  . . # . . .        component 1 = {A1,B1,A2,B2}     (a sealed pocket)
+3  # # # . . .        component 2 = the other 26 cells
+4  . . . . . .        No neighbor-path joins them without
+5  . . . . . .        stepping on a peg.
+6  . . . . . .
+```
+
+**Flood fill** is the standard algorithm for discovering an island given one
+of its cells: pour water on the start cell and let it spread to neighbors
+within the set until it can spread no further (the paint-bucket tool of image
+editors). The textbook implementation keeps a to-visit list and a found set:
+
+```
+found = {start};  to_visit = [start]
+while to_visit not empty:
+    c = pop(to_visit)
+    for each neighbor n of c inside the region and not yet found:
+        add n to found; push n on to_visit
+```
+
+Cost: proportional to the component's area, but with real memory traffic --
+list operations and membership checks, tens of machine ops per cell. To get
+*all* components: fill from any unassigned cell, remove the island found,
+repeat.
+
 ### Pruning: components x sub-multiset sums
 
-After a placement, the still-empty region may have been pinched into pieces.
-Each connected component must be tiled *exactly* by some sub-multiset of the
-remaining pieces -- pieces cannot straddle a gap. A cheap necessary condition
-is arithmetic: the component's *size* must be a sum of some sub-multiset of
-the remaining piece areas.
+Why the solver cares about components at all: a piece is rigid and
+edge-connected, so a placed piece lies wholly inside *one* component -- it
+can never straddle a gap. Each component must therefore be tiled *exactly*
+by some sub-multiset of the remaining pieces, on its own. A cheap necessary
+condition is arithmetic: the component's *size* must be a sum of some
+sub-multiset of the remaining piece areas. In the picture above, the 4-cell
+pocket is hopeless unless the remaining pieces can sum to exactly 4.
 
 Piece areas are `{1,2,3,3,4,4,4,4,4}`. Which sums are achievable by subsets
 of the remaining pieces? That is a subset-sum problem over a 9-element
@@ -70,10 +117,48 @@ and 2x1 are both gone, any component of size 1, 2 *or 5* is fatal (5 = 1+4 =
 2+3 needs a small piece). This prune fires constantly in the endgame and is
 the difference between milliseconds and seconds per board.
 
-The component sizes come from a register-resident flood fill: take the lowest
-bit of the empty region, `gs_grow` it (part 1) to a fixed point, popcount,
-erase, repeat. Each component costs about its diameter in iterations, all on
-one word -- no queue, no visited array.
+### The bit-parallel flood fill
+
+The prune above runs at millions of search nodes per second, so the textbook
+queue-based fill is far too slow -- its per-cell memory traffic would
+dominate the entire computation. The bitmask representation offers a better
+primitive. Because cells are laid out row-major in one word (part 1), a
+single shift instruction moves *every* cell of a set geometrically at once:
+`x << 6` is "the whole set, one row down", `x >> 6` one row up, and guarded
+`<< 1` / `>> 1` one column right/left (the guard masks `NOT_C5` / `NOT_C0`
+delete the edge column first so nothing wraps into the next row). OR the
+four shifted copies onto `x` and clip to the region, and you have
+`gs_grow(x, region)`: the set plus all its neighbors, in ~7 register
+instructions -- regardless of how many cells the set contains.
+
+Flood fill is then `gs_grow` iterated to a fixed point:
+
+```c
+gs_mask comp = empty & (~empty + 1);   /* seed: lowest empty cell */
+gs_mask prev;
+do { prev = comp; comp = gs_grow(comp, empty); }
+while (comp != prev);                  /* stopped growing => island full */
+```
+
+Each iteration spreads the water one full ring, every cell of the ring
+processed by the same 7 instructions:
+
+```
+seed          1 ring        2 rings       3 rings (fixed point)
+. . . .       . # . .       # # # .       # # # #
+# . . .   ->  # # . .   ->  # # # .   ->  # # # #
+. . . .       . # . .       # # # .       # # # #
+```
+
+Iteration count = the farthest hop-distance from the seed, typically 4-8 on
+this board. `popcount(comp)` reads off the component size, `empty ^= comp`
+deletes the island, and the next seed is the new lowest bit. No queue, no
+visited array, no memory traffic at all -- both sets live in registers the
+whole time. A 20-cell component costs ~50 register ops versus ~500
+memory-touching ops for the queue version; that gap is what makes the
+connectivity prune affordable inside the innermost loop. ("Bit-parallel"
+names exactly this style: 36 cells ride in one machine word, so each integer
+instruction does 36 cells' worth of geometry.)
 
 ### Two refinements
 
