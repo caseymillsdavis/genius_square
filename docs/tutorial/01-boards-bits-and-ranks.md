@@ -159,15 +159,48 @@ and `h1..h7` is the notation used throughout.
 
 ### Why an ordering is what we want
 
-To number the boards, pick a total order on all C(36,7) of them and define
+The numbering scheme is: **pick a total order on the boards, then let
+`rank(B)` be the number of boards that come strictly before B.**
 
-```
-rank(B) = how many boards come strictly before B
-```
+A *total order* is a rule for comparing any two boards that lines all of them
+up in a single queue -- no ties, and an answer for every pair. Formally,
+writing `a <= b` for "a comes first", the rule must be reflexive (`a <= a`),
+antisymmetric (`a <= b` and `b <= a` only when `a = b`), transitive, and --
+the interesting one -- **total**: for every pair, either `a <= b` or
+`b <= a`. The first three properties alone make a *partial* order, where
+some pairs may simply be incomparable.
 
-That is automatically a bijection onto `0 .. C(36,7)-1`: the first board gets
-0, the next 1, and so on. All the binomial coefficients below are just closed
-forms for "how many come before", computed without enumerating anything.
+An example of the difference, using our own objects: order boards by
+*containment* (`A <= B` iff A is a subset of B). Reflexive, antisymmetric and
+transitive, but hopeless here -- no 7-cell board contains a different 7-cell
+board, so containment declines to compare any two of them. A rule that
+shrugs at some pairs yields a branching structure, not a queue, and you
+cannot number a branching structure by position.
+
+Lex and colex both answer every time: two distinct boards have different
+sorted peg lists, so scanning those lists (from the front for lex, from the
+back for colex) must reach a position where they differ, and the smaller cell
+number there decides. That is exactly why there are two *valid* schemes to
+choose between rather than one.
+
+Given such an order, `rank(B) = #{A : A < B}` is automatically a bijection
+onto `0 .. C(36,7)-1`:
+
+* if `A < B` then everything before A is before B too, plus A itself, so
+  `rank(A) < rank(B)` -- distinct boards get distinct ranks;
+* every rank counts a sub-collection of the other boards, so it lies in
+  `0 .. N-1`;
+* an injective map between finite sets of the same size is onto, so every
+  index is used exactly once.
+
+Totality is what powers the first bullet -- with incomparable pairs, two
+boards could tie and collide. (The everyday analogue: a total order is what
+a comparison sort needs. `strcmp` totally orders strings, which is why a
+dictionary lists every word in one sequence and "the 4,182nd word" means
+something.)
+
+All the binomial coefficients below are just closed forms for "how many come
+before", computed without building any list.
 
 The classical tool for that is the **combinatorial number system**: for fixed
 k, the k-subsets of `{0..n-1}` in a canonical order correspond to
