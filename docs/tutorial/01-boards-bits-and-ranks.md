@@ -128,37 +128,102 @@ We need a bijection between the C(36,7) = 8,347,680 boards and the integers
 Both directions must be fast (`rank` runs in the innermost loop of the global
 enumeration).
 
-The classical tool is the **combinatorial number system**: for any fixed k,
-the k-subsets of {0..n-1} in some canonical order are in bijection with
+### First, the bridge: a board *is* a subset
+
+The literature on this speaks of subsets and their elements, so pin down what
+those are here before any formulas appear. One board, three equivalent
+descriptions:
+
+| view | pegs at A1, C1, B2, D2, B3, A4, B5 |
+|---|---|
+| grid | seven pegs sitting on seven squares |
+| 36-bit mask | bits 0, 2, 7, 9, 13, 18, 25 are 1, the other 29 are 0 |
+| **subset** | **{0, 2, 7, 9, 13, 18, 25} contained in {0,...,35}** |
+
+The **subset is the set of cell indices that hold a peg**, and its
+**elements are those cell indices** -- ordinary integers in `0..35`. A
+weight-7 mask and a 7-element subset carry identical information (bit `i` is
+set exactly when `i` is in the subset); set language is used below only
+because phrases like "compare their largest elements" are clumsy to say in
+bit terms.
+
+So whenever the text says *order subsets by comparing their largest (or
+smallest) elements*, read: **sort the seven peg cell indices ascending and
+compare those seven numbers.** For the board above the sorted list is
+
+```
+h1=0, h2=2, h3=7, h4=9, h5=13, h6=18, h7=25
+```
+
+and `h1..h7` is the notation used throughout.
+
+### Why an ordering is what we want
+
+To number the boards, pick a total order on all C(36,7) of them and define
+
+```
+rank(B) = how many boards come strictly before B
+```
+
+That is automatically a bijection onto `0 .. C(36,7)-1`: the first board gets
+0, the next 1, and so on. All the binomial coefficients below are just closed
+forms for "how many come before", computed without enumerating anything.
+
+The classical tool for that is the **combinatorial number system**: for fixed
+k, the k-subsets of `{0..n-1}` in a canonical order correspond to
 `0 .. C(n,k)-1` via sums of binomial coefficients. There are two natural
-canonical orders, and the difference between them turned into a real
+orders -- because there are two natural ends of the sorted list to start
+comparing from -- and choosing between them turned out to be a real
 performance decision, so we do both carefully.
 
 ### Colex, the textbook version
 
-Order subsets by comparing their *largest* elements first ("colexicographic").
-The rank of `{c1 < c2 < ... < ck}` is simply
+Compare the sorted peg lists starting from the *largest* peg cell
+("colexicographic"). The rank of a board with pegs `c1 < c2 < ... < ck` is
 
 ```
 rank_colex = C(c1,1) + C(c2,2) + ... + C(ck,k)
 ```
 
-Reason: the number of k-subsets whose largest element is *less than* `ck` is
-C(ck, k), so that term counts all subsets that finish earlier; recurse on the
-remaining k-1 elements below `ck`. It is beautiful and branch-light, and the
-project uses it -- but only for the small internal tables of the analysis
-(part 4), not for boards.
+Reason: the number of boards whose largest peg cell is *less than* `ck` is
+C(ck, k) -- choose all k pegs from the cells `0..ck-1` -- and every one of
+them sorts earlier, so that term counts them all at once; then recurse on the
+remaining k-1 pegs below `ck`. It is beautiful and branch-light, and the
+project does use it -- but only for the small internal tables of the analysis
+(part 4), never for boards. The next subsection says why.
 
 ### Lex, what boards actually use
 
-Order subsets like words: compare *smallest* elements first, so
-`{0,1,2,3,4,5,6}` is rank 0 and `{29,...,35}` is last. To rank
-`h1 < h2 < ... < h7`, count the subsets that come strictly earlier. A subset
-comes earlier iff at some position `i` it agrees with ours on `h1..h(i-1)`
-and its i-th element `x` is smaller than `hi`. For each such `x`
-(`h(i-1) < x < hi`), the remaining `7-i` elements range freely above `x`,
-giving `C(36-1-x, 7-i)` subsets. Summing over `x` telescopes by the
-hockey-stick identity into closed form:
+Compare the sorted peg lists starting from the *smallest* peg cell, exactly
+as a dictionary compares words letter by letter. So the board with pegs
+`{0,1,2,3,4,5,6}` (the top row plus A2) is rank 0, and `{29,...,35}` is last.
+
+To rank `h1 < h2 < ... < h7`, count the boards that come strictly earlier.
+Another board comes earlier exactly when, at the first position `i` where the
+two sorted lists differ, its i-th peg is smaller than `hi`. So walk the
+positions and count:
+
+* boards agreeing with ours on `h1..h(i-1)` whose i-th peg is some
+  `x` with `h(i-1) < x < hi`;
+* for each such `x` the remaining `7-i` pegs may sit anywhere among the
+  `36-1-x` cells above `x`, giving `C(36-1-x, 7-i)` boards.
+
+Concretely for our running example `{0, 2, 7, 9, 13, 18, 25}`:
+
+| position | boards counted here | how many |
+|---|---|---|
+| i=1 | lowest peg `x < 0` | 0 -- nothing beats cell 0 |
+| i=2 | `h1=0`, second peg `x = 1`, other 5 pegs free above | C(34,5) = 278,256 |
+| i=3 | `h1=0, h2=2`, third peg `x` in {3,4,5,6}, other 4 free | C(32,4)+C(31,4)+C(30,4)+C(29,4) = 118,581 |
+| ... | ... | ... |
+| | **total** | **400,675 = `gs_rank`** |
+
+(That total is worth a look in `docs/RESULTS.md`: rank 400,675 is one of the
+100 orbits of boards with a *unique* solution.)
+
+Summing over `x` within each position telescopes by the hockey-stick identity
+(`sum_{j=a..b} C(j,r) = C(b+1,r+1) - C(a,r+1)`) into a two-term closed form
+per position:
 
 ```
 rank_lex = sum over i of [ C(35 - h(i-1), 8-i) - C(36 - hi, 8-i) ]     (h0 = -1)
@@ -215,11 +280,14 @@ The global enumeration performs ~11.4 billion increments of
 from the ranking function:
 
 * Under **lex**, fixing the first `j` (lowest) pegs confines the rank to a
-  contiguous interval of length `C(35 - hj, 7-j)`. The search decides cells
-  in increasing order, so an entire DFS subtree writes into one window that
-  *shrinks geometrically with depth* -- by the time the last pegs are being
-  placed, the window is a few hundred bytes and lives in L1. Sibling leaves
-  touch adjacent addresses.
+  contiguous interval of length `C(35 - hj, 7-j)` -- visible in the worked
+  table above, where the `i=1` column stays put while later columns move.
+  The search decides cells in increasing order, so it discovers pegs
+  smallest-first, and an entire DFS subtree writes into one window that
+  *shrinks geometrically with depth*: knowing `h1=0` leaves C(35,6) = 1.6M
+  possible ranks, knowing `h1,h2,h3` leaves C(28,4) = 20,475, and by the last
+  pegs the window is a few hundred bytes living in L1. Sibling leaves touch
+  adjacent addresses.
 * Under **colex**, the rank is dominated by the term `C(c7, 7)` of the
   *largest* peg -- exactly the coordinate that varies fastest deep in the
   search. Consecutive leaves would scatter increments across the entire
