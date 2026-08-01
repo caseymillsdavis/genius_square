@@ -4,7 +4,8 @@
 # deploy is gated on web/verify.mjs agreeing with the real C engine.  If the
 # port drifts, the site does not ship.
 #
-# One-time setup: repository Settings -> Pages -> Source: "GitHub Actions".
+# enablement: true lets the first run switch the repository's Pages source to
+# "GitHub Actions" itself, so there is no manual setup step.
 name: pages
 
 on:
@@ -50,6 +51,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web
