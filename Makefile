@@ -5,6 +5,7 @@
 #   make counts     compute data/counts.gsc  (the long one)
 #   make report     regenerate docs/RESULTS.md and docs/ANALYSIS*.md
 #   make all-data   counts + report
+#   make web-verify cross-check web/gs.js against the C engine (needs node)
 
 CC      ?= gcc
 # gnu11 rather than c11: clock_gettime and strtok_r are POSIX, not ISO C
@@ -25,7 +26,7 @@ TOOLS   := $(BIN)/gs_selftest $(BIN)/gs_countall $(BIN)/gs_solve \
 # number of worker threads for the big enumeration
 J       ?= $(shell nproc 2>/dev/null || echo 4)
 
-.PHONY: all test counts report all-data clean
+.PHONY: all test counts report all-data web-verify clean
 
 all: $(TOOLS)
 
@@ -63,6 +64,12 @@ report: $(BIN)/gs_stats $(BIN)/gs_analyze $(DATA)/counts.gsc
 	$(BIN)/gs_analyze -c $(DATA)/counts.gsc --deg3 --hard 100 -o $(DOCS)/ANALYSIS_HARD.md
 
 all-data: counts report
+
+# web/gs.js is a hand port of gs_core.c + gs_search.c; this checks it still
+# agrees with the original.  node is not a project dependency -- this is the
+# one target that needs it.
+web-verify: $(BIN)/gs_solve
+	node web/verify.mjs 300
 
 clean:
 	rm -rf $(BIN)

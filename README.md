@@ -13,6 +13,12 @@ studies **all** `C(36,7) = 8,347,680` peg placements.
 Everything is C11 with no dependencies beyond zlib and pthreads. See
 [AGENTS.md](AGENTS.md) before making changes.
 
+**Solve a board in the browser:
+[caseymillsdavis.github.io/genius_square](https://caseymillsdavis.github.io/genius_square/)** --
+place the seven pegs, get the exact solution count, browse the solutions, and
+see where the board falls in the distribution of all 8.3M boards. It runs
+entirely client-side; nothing is uploaded.
+
 ## Headline numbers
 
 | | |
@@ -82,6 +88,7 @@ exercises. The other docs are terse references by comparison.
 
 ```
 src/            the library and the five tools (see AGENTS.md)
+web/            the browser solver published to GitHub Pages
 docs/tutorial/  four-part deep dive: representations, search, symmetry, analysis
 docs/PLAN.md    goals and status
 docs/ALGORITHMS.md   the counting scheme, symmetry, pruning, verification

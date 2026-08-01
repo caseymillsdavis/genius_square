@@ -1,0 +1,57 @@
+# Publishes web/ to GitHub Pages.
+#
+# The solver on that page is a hand port of gs_core.c + gs_search.c, so the
+# deploy is gated on web/verify.mjs agreeing with the real C engine.  If the
+# port drifts, the site does not ship.
+#
+# One-time setup: repository Settings -> Pages -> Source: "GitHub Actions".
+name: pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths: ["web/**", "src/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: install zlib headers
+        run: sudo apt-get update && sudo apt-get install -y zlib1g-dev
+      - name: build the C tools
+        run: make CFLAGS="-O2 -std=gnu11 -Wall -Wextra -Wno-unused-result"
+      - name: structural self-test
+        run: make CFLAGS="-O2 -std=gnu11 -Wall -Wextra -Wno-unused-result" test
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: cross-check the browser engine against the C engine
+        run: node web/verify.mjs 300
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -28,7 +28,15 @@ docs/                 PLAN, ALGORITHMS, FORMATS, HARDNESS + generated results
 docs/tutorial/        pedagogical deep dive (read this to *learn* the design;
                       keep it consistent if you change what it describes)
 data/counts.gsc       the computed count table (committed, ~2 MB)
+web/                  browser solver published to GitHub Pages (see below)
 ```
+
+`web/` is the only JavaScript in the project. `web/gs.js` is a hand port of
+`gs_core.c` + `gs_search.c` -- same cell numbering, same piece list, same
+placement order, same DFS -- so it enumerates solutions in the same order as
+`bin/gs_solve --all`. `web/app.js` is DOM only; `web/verify.mjs` is the
+cross-check. **If you change the pieces, the placement table or the search,
+re-run `make web-verify`**; nothing else will catch the port drifting.
 
 ## Build and run
 
@@ -37,7 +45,13 @@ make            # everything into bin/
 make test       # gs_selftest -- run this after ANY change to core or search
 make counts     # the long enumeration (~12 min on 4 cores); writes data/counts.gsc
 make report     # regenerates docs/RESULTS.md and docs/ANALYSIS_*.md
+make web-verify # checks web/gs.js against the C engine (the only target
+                # that needs node; ~25 s)
 ```
+
+The page in `web/` is static: no build step, no dependencies. To look at it
+locally, serve the directory over HTTP (ES modules will not load over
+`file://`) and open `web/index.html`.
 
 ## Rules that are easy to break by accident
 
@@ -60,6 +74,11 @@ whose hole set is lexicographically greater than its left-right mirror image,
 decided one row at a time. If you touch it, `make test` checks the row-wise
 verdict against a direct whole-board comparison on 300,000 random boards, and
 `gs_countall --nosym` disables it. Both matter.
+
+**The browser port is a second copy of the search.** `web/gs.js` duplicates the
+piece list, the placement order and the DFS. Changing either side without the
+other makes the published page silently disagree with the tools; `make
+web-verify` is the check.
 
 **Solution counts must be D4-invariant.** This is the single most useful
 invariant in the codebase. Any bug in placement generation, ranking, or the

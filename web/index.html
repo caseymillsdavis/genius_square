@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Genius Square solver</title>
+<meta name="description" content="Enter the seven pegs, get every solution -- plus where the board sits in the full distribution of all 8,347,680 boards.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%232f6feb'/><rect x='3' y='3' width='4' height='4' fill='%23fff'/><rect x='9' y='3' width='4' height='4' fill='%23ffd166'/><rect x='3' y='9' width='4' height='4' fill='%23ef476f'/><rect x='9' y='9' width='4' height='4' fill='%2306d6a0'/></svg>">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+
+<header class="top">
+  <h1>Genius Square solver</h1>
+  <p class="sub">Place the seven pegs; get the exact number of solutions, the
+     solutions themselves, and where the board sits among all
+     <strong>8,347,680</strong> boards.</p>
+  <p class="repo"><a href="https://github.com/caseymillsdavis/genius_square">caseymillsdavis/genius_square</a></p>
+</header>
+
+<main>
+
+  <section class="panel board-panel">
+    <h2>The board</h2>
+
+    <div class="grid-wrap">
+      <div id="grid" class="grid" role="grid" aria-label="6 by 6 board, click a cell to place or remove a peg"></div>
+    </div>
+
+    <p id="pegcount" class="pegcount">0 of 7 pegs</p>
+
+    <div class="controls">
+      <label class="field">
+        <span>Pegs</span>
+        <input id="pegs-input" type="text" spellcheck="false" autocomplete="off"
+               placeholder="A1 C1 E1 B4 D4 F4 C6">
+      </label>
+      <div class="buttons">
+        <button id="btn-clear" type="button">Clear</button>
+        <button id="btn-random" type="button">Random board</button>
+        <button id="btn-hard" type="button">Notable board</button>
+      </div>
+    </div>
+
+    <p id="parse-error" class="error" hidden></p>
+
+    <details class="note">
+      <summary>How to read the board</summary>
+      <p>Columns are <code>A</code>–<code>F</code> left to right, rows
+      <code>1</code>–<code>6</code> top to bottom, matching the physical game
+      and the <code>gs_solve</code> command line. Click a cell to toggle a peg,
+      or type the seven cells directly. The nine pieces have areas summing to
+      exactly <strong>29 = 36 − 7</strong>, so every solution uses every piece
+      and covers every non-peg cell.</p>
+      <p>This page ignores the dice that ship with the game, for the same
+      reason the repository does: they exist only to guarantee a solvable
+      board. Any seven pegs are fair game here, including the 2.07% that
+      cannot be solved at all.</p>
+    </details>
+  </section>
+
+  <section class="panel result-panel">
+    <h2>Result</h2>
+
+    <div id="idle" class="placeholder">
+      <p>Place seven pegs to solve.</p>
+    </div>
+
+    <div id="busy" class="placeholder" hidden><p>Solving…</p></div>
+
+    <div id="result" hidden>
+      <div class="verdict">
+        <div class="count">
+          <span id="count-value">0</span>
+          <span id="count-label" class="count-label">solutions</span>
+        </div>
+        <div id="verdict-note" class="verdict-note"></div>
+      </div>
+
+      <div id="distribution" class="distribution"></div>
+
+      <div id="solution-block">
+        <div class="solution-head">
+          <h3>Solutions</h3>
+          <div class="pager">
+            <button id="btn-prev" type="button" aria-label="previous solution">←</button>
+            <span id="sol-label">1 of 1</span>
+            <button id="btn-next" type="button" aria-label="next solution">→</button>
+          </div>
+        </div>
+        <div class="grid-wrap solution-wrap">
+          <div id="solution-grid" class="grid solution" role="img"></div>
+        </div>
+        <div id="legend" class="legend"></div>
+        <p id="thumbs-note" class="hint"></p>
+        <div id="thumbs" class="thumbs"></div>
+      </div>
+
+      <div class="tables">
+        <div class="table-block">
+          <h3>Piece freedom</h3>
+          <p class="hint">How many distinct positions each piece takes across
+             the whole solution set. A piece with exactly one is
+             <em>pinned</em> by the pegs.</p>
+          <table id="freedom"></table>
+        </div>
+
+        <div class="table-block">
+          <h3>Board facts</h3>
+          <table id="facts"></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>Everything runs in this page — the search is a port of
+     <code>src/gs_core.c</code> and <code>src/gs_search.c</code>, cross-checked
+     against the C engine by <code>web/verify.mjs</code>. The distribution
+     figures come from <code>data/counts.gsc</code> via
+     <a href="https://github.com/caseymillsdavis/genius_square/blob/main/docs/RESULTS.md">docs/RESULTS.md</a>.</p>
+</footer>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
